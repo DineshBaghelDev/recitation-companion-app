@@ -87,7 +87,7 @@ recitation-companion-app/
 #### 1. Clone Repository
 
 ```powershell
-git clone https://github.com/yourusername/recitation-companion-app.git
+git clone https://github.com/DineshBaghelDev/recitation-companion-app.git
 cd recitation-companion-app
 ```
 
@@ -378,7 +378,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## 🙏 Acknowledgments
 
 - **Bhagavad Gita API**: GitHub Pages Vedic Scriptures API
-- **TTS Engine**: Vakyansh Sanskrit TTS by Reverie Language Technologies
+- **TTS Engine**: gTTS by Google
 - **Icons**: Material Design Icons
 - **Fonts**: Google Fonts (Poppins, Noto Sans Devanagari)
 
@@ -388,7 +388,6 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 For issues, questions, or contributions:
 - Create an issue on GitHub
-- Contact: [your-email@example.com]
 
 ---
 
