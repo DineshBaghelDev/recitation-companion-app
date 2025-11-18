@@ -2,6 +2,11 @@
 class ApiConfig {
   /// Base URL for the backend API
   /// Change this to match your backend server address
+  /// 
+  /// For Android Emulator: use 10.0.2.2 instead of localhost
+  /// For Physical Device: use your computer's IP address (e.g., 192.168.1.x)
+  /// For iOS Simulator: use localhost
+  /// For Web: use localhost
   static const String baseUrl = 'http://localhost:8000';
   
   /// API version

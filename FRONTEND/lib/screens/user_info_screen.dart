@@ -29,6 +29,12 @@ class _UserInfoScreenState extends ConsumerState<UserInfoScreen> {
     'Tamil',
     'Telugu',
   ];
+  
+  // Languages that are currently available
+  final List<String> _availableLanguages = [
+    'English',
+    'Hindi',
+  ];
 
   final List<String> _goals = [
     'Daily Practice',
@@ -55,6 +61,68 @@ class _UserInfoScreenState extends ConsumerState<UserInfoScreen> {
       // Navigate to home
       Navigator.of(context).pushReplacementNamed(AppShell.routeName);
     }
+  }
+  
+  void _showNotifyMeDialog(String language) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.notifications_none, color: AppDesignSystem.primaryColor),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                '$language Coming Soon!',
+                style: const TextStyle(fontSize: 20),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'We\'re working hard to add $language support.',
+              style: const TextStyle(fontSize: 16),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Would you like to be notified when it becomes available?',
+              style: TextStyle(
+                fontSize: 14,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Maybe Later'),
+          ),
+          FilledButton.icon(
+            onPressed: () {
+              // TODO: Save notification preference
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('We\'ll notify you when $language is available!'),
+                  backgroundColor: Colors.green,
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+            icon: const Icon(Icons.notifications_active, size: 18),
+            label: const Text('Notify Me'),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppDesignSystem.primaryColor,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -169,15 +237,52 @@ class _UserInfoScreenState extends ConsumerState<UserInfoScreen> {
                         contentPadding: const EdgeInsets.all(AppDesignSystem.spacing20),
                       ),
                       items: _languages.map((language) {
+                        final isAvailable = _availableLanguages.contains(language);
                         return DropdownMenuItem(
                           value: language,
-                          child: Text(language),
+                          enabled: isAvailable,
+                          onTap: !isAvailable ? () => _showNotifyMeDialog(language) : null,
+                          child: Row(
+                            children: [
+                              Text(
+                                language,
+                                style: TextStyle(
+                                  color: isAvailable 
+                                    ? null 
+                                    : colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                                ),
+                              ),
+                              if (!isAvailable) ...[
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange.shade100,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    'Soon',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.orange.shade800,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
                         );
                       }).toList(),
                       onChanged: (value) {
-                        setState(() {
-                          _selectedLanguage = value!;
-                        });
+                        if (_availableLanguages.contains(value)) {
+                          setState(() {
+                            _selectedLanguage = value!;
+                          });
+                        } else {
+                          // Show notify me dialog
+                          _showNotifyMeDialog(value!);
+                        }
                       },
                     ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.1),
                   ],

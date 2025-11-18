@@ -1,11 +1,15 @@
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:record/record.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../providers/verse_providers.dart';
+import '../providers/favorites_provider.dart';
 import '../services/tts_service.dart';
 
 class VerseDetailScreen extends ConsumerStatefulWidget {
@@ -22,6 +26,7 @@ class VerseDetailScreen extends ConsumerStatefulWidget {
 class _VerseDetailScreenState extends ConsumerState<VerseDetailScreen> {
   late final TtsService _ttsService;
   late final AudioPlayer _player;
+  late final AudioRecorder _recorder;
   double _playbackPosition = 0.0;
   bool _isPlaying = false;
   bool _isLoading = false;
@@ -32,12 +37,21 @@ class _VerseDetailScreenState extends ConsumerState<VerseDetailScreen> {
   double _lastNotifiedProgress = 0.0;
   String? _currentVerseText;
   DateTime? _lastAudioProgressUpdate;
+  
+  // For word highlighting
+  int _currentWordIndex = 0;
+  List<String> _words = [];
+  bool _isPaused = false;
+  
+  // For audio recording
+  bool _isRecording = false;
 
   @override
   void initState() {
     super.initState();
     _ttsService = TtsService();
     _player = AudioPlayer();
+    _recorder = AudioRecorder();
     _setupAudioPlayer();
     _setupTtsService();
   }
@@ -122,14 +136,25 @@ class _VerseDetailScreenState extends ConsumerState<VerseDetailScreen> {
       if (_isTtsMode) {
         // Use Text-to-Speech via backend
         if (_isPlaying) {
-          await _ttsService.stop();
-          setState(() {
-            _isPlaying = false;
-            _playbackPosition = 0.0;
-            _lastNotifiedProgress = 0.0;
-            _lastNotifiedPosition = Duration.zero;
-          });
+          // Currently playing - pause it
+          await _ttsService.pause();
+          if (mounted) {
+            setState(() {
+              _isPlaying = false;
+              _isPaused = true;
+            });
+          }
+        } else if (_isPaused) {
+          // Currently paused - resume it
+          await _ttsService.resume();
+          if (mounted) {
+            setState(() {
+              _isPlaying = true;
+              _isPaused = false;
+            });
+          }
         } else {
+          // Not playing - start new playback
           if (_currentVerseText == null || _currentVerseText!.isEmpty) {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -139,10 +164,17 @@ class _VerseDetailScreenState extends ConsumerState<VerseDetailScreen> {
             return;
           }
           
-          setState(() {
-            _isPlaying = true;
-            _isLoading = true;
-          });
+          // Split text into words for highlighting
+          _words = _currentVerseText!.split(RegExp(r'\s+'));
+          _currentWordIndex = 0;
+          
+          if (mounted) {
+            setState(() {
+              _isPlaying = true;
+              _isLoading = true;
+              _isPaused = false;
+            });
+          }
           
           try {
             await _ttsService.speak(
@@ -165,25 +197,36 @@ class _VerseDetailScreenState extends ConsumerState<VerseDetailScreen> {
 
                 _lastAudioProgressUpdate = now;
 
+                // Update word index based on progress
+                final newWordIndex = (_words.length * progress).floor().clamp(0, _words.length - 1);
+
                 setState(() {
                   _playbackPosition = progress.clamp(0.0, 1.0);
                   _lastNotifiedProgress = progress;
                   _position = position;
                   _duration = duration;
+                  _currentWordIndex = newWordIndex;
                 });
               },
               onComplete: () {
                 if (mounted) {
                   setState(() {
                     _isPlaying = false;
+                    _isPaused = false;
                     _playbackPosition = 0.0;
                     _lastNotifiedProgress = 0.0;
+                    _currentWordIndex = 0;
                   });
                 }
               },
             );
           } catch (e) {
             if (mounted) {
+              setState(() {
+                _isPlaying = false;
+                _isPaused = false;
+                _isLoading = false;
+              });
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text('TTS error: $e')),
               );
@@ -209,6 +252,7 @@ class _VerseDetailScreenState extends ConsumerState<VerseDetailScreen> {
         setState(() {
           _isPlaying = false;
           _isLoading = false;
+          _isPaused = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Playback error: $e')),
@@ -267,11 +311,311 @@ class _VerseDetailScreenState extends ConsumerState<VerseDetailScreen> {
     _lastNotifiedPosition = Duration.zero;
   }
 
+  Widget _buildHighlightedText(String text, TextTheme textTheme) {
+    if (_words.isEmpty || !_isPlaying) {
+      // Not playing or no words split yet - show normal text
+      return Text(
+        text,
+        style: textTheme.titleLarge?.copyWith(
+          fontWeight: FontWeight.w700,
+          height: 1.4,
+        ),
+        textAlign: TextAlign.center,
+      );
+    }
+
+    // Build rich text with highlighted current word
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: 8,
+      runSpacing: 8,
+      children: _words.asMap().entries.map((entry) {
+        final index = entry.key;
+        final word = entry.value;
+        final isCurrentWord = index == _currentWordIndex;
+
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: isCurrentWord 
+                ? const Color(0xFFFF6B35).withOpacity(0.3)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            word,
+            style: textTheme.titleLarge?.copyWith(
+              fontWeight: isCurrentWord ? FontWeight.w900 : FontWeight.w700,
+              height: 1.4,
+              color: isCurrentWord 
+                  ? const Color(0xFFD84315)
+                  : Colors.black87,
+              shadows: isCurrentWord ? [
+                Shadow(
+                  color: const Color(0xFFFF6B35).withOpacity(0.3),
+                  blurRadius: 8,
+                ),
+              ] : null,
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
   @override
   void dispose() {
     _player.dispose();
     _ttsService.dispose();
+    _recorder.dispose();
     super.dispose();
+  }
+
+  Future<void> _startRecording() async {
+    try {
+      // Check if recorder has permission first
+      if (!await _recorder.hasPermission()) {
+        // Request microphone permission
+        final status = await Permission.microphone.request();
+        if (!status.isGranted) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Microphone permission is required for recording'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
+      }
+
+      // Start recording with explicit config
+      // Use a simple path that doesn't require path_provider plugin
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final config = RecordConfig(
+        encoder: AudioEncoder.aacLc,
+        bitRate: 128000,
+        sampleRate: 44100,
+      );
+      
+      // For Android, use app's cache directory path directly
+      // For iOS, use app's document directory path directly
+      await _recorder.start(config, path: '/data/user/0/com.example.recitation_companion/cache/recording_$timestamp.m4a');
+      
+      if (mounted) {
+        setState(() {
+          _isRecording = true;
+        });
+        
+        // Show recording started feedback
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Recording started'),
+            duration: Duration(seconds: 1),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } on MissingPluginException {
+      if (mounted) {
+        setState(() {
+          _isRecording = false;
+        });
+        
+        // Show immediate error dialog
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.error_outline, color: Colors.red),
+                SizedBox(width: 8),
+                Text('Plugin Error'),
+              ],
+            ),
+            content: const Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'The recording feature requires a full app restart to work properly.',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 12),
+                Text('Please:'),
+                SizedBox(height: 8),
+                Text('1. Stop the app completely'),
+                Text('2. Restart the app'),
+                Text('3. Try recording again'),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isRecording = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to start recording: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _stopRecording() async {
+    try {
+      final path = await _recorder.stop();
+      
+      if (mounted) {
+        setState(() {
+          _isRecording = false;
+        });
+      }
+
+      if (path != null) {
+        // Analyze the recording
+        await _analyzePronunciation(path);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isRecording = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to stop recording: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _analyzePronunciation(String recordingPath) async {
+    if (!mounted) return;
+
+    // Show analyzing dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: Card(
+          margin: EdgeInsets.all(32),
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Analyzing pronunciation...'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    // TODO: Implement actual pronunciation analysis with backend API
+    // For now, simulate with delay and show mock results
+    await Future.delayed(const Duration(seconds: 2));
+
+    if (!mounted) return;
+    Navigator.of(context).pop(); // Close analyzing dialog
+
+    // Mock results - replace with actual API call
+    final mockAccuracy = 75 + (DateTime.now().millisecond % 20);
+    final mockDifficultWords = ['धर्मक्षेत्रे', 'समवेता', 'युयुत्सवः'];
+
+    // Show results dialog
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Pronunciation Analysis'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  '$mockAccuracy%',
+                  style: const TextStyle(
+                    fontSize: 48,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFFFF6B35),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const Center(
+              child: Text(
+                'Pronunciation Accuracy',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey,
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'Difficult Words:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            ...mockDifficultWords.map((word) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  const Icon(Icons.warning_amber, size: 20, color: Colors.orange),
+                  const SizedBox(width: 8),
+                  Text(word),
+                ],
+              ),
+            )),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _startRecording(); // Record again
+            },
+            child: const Text('Try Again'),
+          ),
+        ],
+      ),
+    );
+
+    // Clean up recording file
+    try {
+      final file = File(recordingPath);
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (e) {
+      // Ignore cleanup errors
+    }
   }
 
   @override
@@ -407,6 +751,34 @@ class _VerseDetailScreenState extends ConsumerState<VerseDetailScreen> {
                         onPressed: () => Navigator.of(context).maybePop(),
                       ),
                       const Spacer(),
+                      Consumer(
+                        builder: (context, ref, child) {
+                          final favorites = ref.watch(favoritesProvider);
+                          final isFavorite = favorites.any(
+                            (v) => v.chapter == verse.chapter && v.verse == verse.verse,
+                          );
+                          return IconButton(
+                            icon: Icon(
+                              isFavorite ? Icons.favorite : Icons.favorite_border,
+                              color: Colors.white,
+                            ),
+                            tooltip: isFavorite ? 'Remove from favourites' : 'Add to favourites',
+                            onPressed: () {
+                              ref.read(favoritesProvider.notifier).toggleFavorite(verse);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    isFavorite
+                                        ? 'Removed from favourites'
+                                        : 'Added to favourites',
+                                  ),
+                                  duration: const Duration(seconds: 1),
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      ),
                       IconButton(
                         icon: const Icon(Icons.copy_outlined, color: Colors.white),
                         tooltip: 'Copy verse',
@@ -428,8 +800,8 @@ class _VerseDetailScreenState extends ConsumerState<VerseDetailScreen> {
                     child: Column(
                       children: [
                         Container(
-                          width: 110,
-                          height: 110,
+                          width: 150,
+                          height: 150,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(color: Colors.white.withValues(alpha: 0.8), width: 3),
@@ -443,11 +815,14 @@ class _VerseDetailScreenState extends ConsumerState<VerseDetailScreen> {
                             color: Colors.white,
                           ),
                           child: ClipOval(
-                            child: Image.asset(
-                              'assets/images/mascot.png',
-                              width: 110,
-                              height: 110,
-                              fit: BoxFit.cover,
+                            child: Transform.scale(
+                              scale: 1.4, // Scale up to crop out the 30px margin
+                              child: Image.asset(
+                                'assets/images/mascot2.png',
+                                width: 150,
+                                height: 150,
+                                fit: BoxFit.cover,
+                              ),
                             ),
                           ),
                         ),
@@ -486,14 +861,8 @@ class _VerseDetailScreenState extends ConsumerState<VerseDetailScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              Text(
-                                verse.slok,
-                                style: textTheme.titleLarge?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                  height: 1.4,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
+                              // Word-by-word highlighted text
+                              _buildHighlightedText(verse.slok, textTheme),
                             ],
                           ),
                         ).animate(delay: 200.ms).fadeIn().slideY(begin: 0.08),
@@ -526,19 +895,18 @@ class _VerseDetailScreenState extends ConsumerState<VerseDetailScreen> {
         accuracyPercent: accuracyPercent,
         isPlaying: _isPlaying,
         isLoading: _isLoading,
+        isRecording: _isRecording,
         isTtsMode: _isTtsMode,
         onPlay: _togglePlayback,
         onPause: _togglePlayback,
         onRecord: () async {
-          // Show info about recording
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Recording and pronunciation analysis coming soon!'),
-              backgroundColor: primaryColor,
-              behavior: SnackBarBehavior.floating,
-              duration: const Duration(seconds: 2),
-            ),
-          );
+          if (_isRecording) {
+            // Stop recording if already recording
+            await _stopRecording();
+          } else {
+            // Start recording
+            await _startRecording();
+          }
         },
         onRetry: _skipBackward,
         onSkipForward: _skipForward,
@@ -656,6 +1024,7 @@ class _RecitationControlBar extends StatelessWidget {
     required this.playbackPosition,
     required this.isPlaying,
     required this.isLoading,
+    required this.isRecording,
     required this.isTtsMode,
     required this.onTogglePlayback,
     required this.onPositionChanged,
@@ -675,6 +1044,7 @@ class _RecitationControlBar extends StatelessWidget {
   final double playbackPosition;
   final bool isPlaying;
   final bool isLoading;
+  final bool isRecording;
   final bool isTtsMode;
   final VoidCallback onTogglePlayback;
   final ValueChanged<double> onPositionChanged;
@@ -751,20 +1121,9 @@ class _RecitationControlBar extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                IconButton(
-                  icon: const Icon(Icons.replay_10_rounded),
-                  iconSize: 32,
-                  onPressed: onRetry,
-                  tooltip: 'Rewind 10 seconds',
-                ),
-                IconButton(
-                  icon: const Icon(Icons.skip_previous_rounded),
-                  iconSize: 32,
-                  onPressed: onPrevious,
-                  tooltip: 'Previous verse',
-                ),
+                // Play/Pause button
                 Container(
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
@@ -811,18 +1170,61 @@ class _RecitationControlBar extends StatelessWidget {
                     ),
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.skip_next_rounded),
-                  iconSize: 32,
-                  onPressed: onNext,
-                  tooltip: 'Next verse',
-                ),
-                IconButton(
-                  icon: const Icon(Icons.forward_10_rounded),
-                  iconSize: 32,
-                  onPressed: onSkipForward,
-                  tooltip: 'Forward 10 seconds',
-                ),
+                const SizedBox(width: 32),
+                // Record button
+                Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: isRecording
+                          ? [
+                              Colors.red,
+                              Colors.red.withValues(alpha: 0.8),
+                            ]
+                          : [
+                              const Color(0xFFD84315),
+                              const Color(0xFFD84315).withValues(alpha: 0.8),
+                            ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: (isRecording ? Colors.red : const Color(0xFFD84315))
+                            .withValues(alpha: 0.4),
+                        blurRadius: isRecording ? 24 : 16,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: onRecord,
+                      customBorder: const CircleBorder(),
+                      child: Container(
+                        width: 64,
+                        height: 64,
+                        alignment: Alignment.center,
+                        child: Icon(
+                          isRecording ? Icons.stop_rounded : Icons.mic_rounded,
+                          size: 32,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+                    .animate(
+                      onPlay: (controller) => isRecording
+                          ? controller.repeat(reverse: true)
+                          : controller.stop(),
+                    )
+                    .scale(
+                      duration: 800.ms,
+                      begin: const Offset(1.0, 1.0),
+                      end: const Offset(1.1, 1.1),
+                    ),
               ],
             ),
           ],

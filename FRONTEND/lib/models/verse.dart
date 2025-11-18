@@ -18,10 +18,14 @@ class Verse {
   final double mastery;
 
   factory Verse.fromJson(Map<String, dynamic> json) {
+    // Clean slok text by removing "|| chapter-verse ||" pattern at the end
+    String cleanedSlok = json['slok'] as String;
+    cleanedSlok = cleanedSlok.replaceAll(RegExp(r'\|\|[^|]*\d+-\d+[^|]*\|\|'), '').trim();
+    
     return Verse(
       chapter: json['chapter'] as int,
       verse: json['verse'] as int,
-      slok: json['slok'] as String,
+      slok: cleanedSlok,
       transliteration: json['transliteration'] as String,
       hindiTranslation: json['hindi_translation'] as String,
       englishTranslation: json['english_translation'] as String,

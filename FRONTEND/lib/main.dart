@@ -4,9 +4,12 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'screens/ai_guru_screen.dart';
 import 'screens/app_shell.dart';
 import 'screens/course_progress_screen.dart';
+import 'screens/favorites_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/problematic_verses_screen.dart';
 import 'screens/user_info_screen.dart';
 import 'screens/verse_detail_screen.dart';
 
@@ -116,6 +119,21 @@ class RecitationApp extends StatelessWidget {
             final courseId = settings.arguments as String?;
             return MaterialPageRoute(
               builder: (_) => CourseProgressScreen(courseId: courseId ?? ''),
+              settings: settings,
+            );
+          case FavoritesScreen.routeName:
+            return MaterialPageRoute(
+              builder: (_) => const FavoritesScreen(),
+              settings: settings,
+            );
+          case ProblematicVersesScreen.routeName:
+            return MaterialPageRoute(
+              builder: (_) => const ProblematicVersesScreen(),
+              settings: settings,
+            );
+          case AIGuruScreen.routeName:
+            return MaterialPageRoute(
+              builder: (_) => const AIGuruScreen(),
               settings: settings,
             );
           default:

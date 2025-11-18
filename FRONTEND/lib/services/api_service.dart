@@ -8,9 +8,9 @@ class ApiService {
   // API prefix
   static const String apiPrefix = '/api/v1';
   
-  // Timeout duration for API calls
-  static const Duration timeoutDuration = Duration(seconds: 3);
-  static const Duration longTimeoutDuration = Duration(seconds: 3); // For batch operations
+  // Timeout duration for API calls - increased to handle slower connections
+  static const Duration timeoutDuration = Duration(seconds: 30);
+  static const Duration longTimeoutDuration = Duration(seconds: 60); // For batch operations
 
   // Determine base URL depending on platform. Use configurable host overrides for physical devices.
   static const String _overrideBaseUrl =
@@ -180,8 +180,9 @@ class ApiService {
 
   // Get verse of the day
   static Future<Map<String, dynamic>> getVerseOfTheDay() async {
+    // Use longer timeout for verse of the day as it may need to fetch from external API
     final response =
-        await _get(_buildUri('$apiPrefix/verse-of-the-day'), timeoutDuration);
+        await _get(_buildUri('$apiPrefix/verse-of-the-day'), longTimeoutDuration);
     if (response.statusCode == 200) {
       return _decodeMap(response);
     }

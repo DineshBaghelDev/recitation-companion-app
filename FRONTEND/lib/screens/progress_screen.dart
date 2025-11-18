@@ -3,8 +3,6 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/design_system.dart';
-import '../models/course.dart';
-import '../providers/course_providers.dart';
 import '../providers/verse_providers.dart';
 
 class ProgressScreen extends ConsumerWidget {
@@ -15,7 +13,6 @@ class ProgressScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final stats = ref.watch(progressStatsProvider);
-    final coursesAsync = ref.watch(courseListProvider);
     final textTheme = Theme.of(context).textTheme;
 
     return SafeArea(
@@ -34,7 +31,12 @@ class ProgressScreen extends ConsumerWidget {
                 const Spacer(),
                 IconButton(
                   onPressed: () {
-                    Navigator.of(context).pushNamed('/profile');
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Settings coming soon! Use Profile tab for account settings.'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
                   },
                   icon: const Icon(Icons.settings_outlined),
                 ),
@@ -66,35 +68,35 @@ class ProgressScreen extends ConsumerWidget {
             _PronunciationCard(average: stats.averagePronunciation),
             const SizedBox(height: AppDesignSystem.spacing24),
             Text(
-              'Course Progress',
+              'Pronunciation Score by Chapter',
               style: AppDesignSystem.subheading(textTheme),
             ),
+            const SizedBox(height: AppDesignSystem.spacing8),
+            Text(
+              'Track your pronunciation accuracy for each chapter',
+              style: AppDesignSystem.caption(textTheme, Theme.of(context).colorScheme.onSurfaceVariant),
+            ),
             const SizedBox(height: AppDesignSystem.spacing12),
-            coursesAsync.when(
-              data: (courses) => SizedBox(
-                height: 170,
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Row(
-                    children: courses
-                        .map(
-                          (course) => Padding(
-                            padding: const EdgeInsets.only(right: 24),
-                            child: _CourseProgressChip(course: course),
-                          ),
-                        )
-                        .toList(),
-                  ),
+            // Show pronunciation scores for first 18 chapters (Bhagavad Gita)
+            SizedBox(
+              height: 170,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  children: List.generate(18, (index) {
+                    final chapter = index + 1;
+                    // Mock pronunciation scores - in production, fetch from backend
+                    final score = (75 + (chapter * 1.2) % 25).round();
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 24),
+                      child: _ChapterPronunciationChip(
+                        chapterNumber: chapter,
+                        score: score,
+                      ),
+                    );
+                  }),
                 ),
-              ),
-              loading: () => const SizedBox(
-                height: 170,
-                child: Center(child: CircularProgressIndicator()),
-              ),
-              error: (_, __) => const SizedBox(
-                height: 170,
-                child: Center(child: Text('Unable to load courses')),
               ),
             ),
             const SizedBox(height: 24),
@@ -219,15 +221,31 @@ class _PronunciationCard extends StatelessWidget {
   }
 }
 
-class _CourseProgressChip extends StatelessWidget {
-  const _CourseProgressChip({required this.course});
+class _ChapterPronunciationChip extends StatelessWidget {
+  const _ChapterPronunciationChip({
+    required this.chapterNumber,
+    required this.score,
+  });
 
-  final Course course;
+  final int chapterNumber;
+  final int score;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
+    
+    // Determine color based on score
+    Color scoreColor;
+    if (score >= 90) {
+      scoreColor = Colors.green;
+    } else if (score >= 75) {
+      scoreColor = AppDesignSystem.primaryColor;
+    } else if (score >= 60) {
+      scoreColor = Colors.orange;
+    } else {
+      scoreColor = Colors.red;
+    }
 
     return Column(
       children: [
@@ -241,32 +259,59 @@ class _CourseProgressChip extends StatelessWidget {
                 width: 100,
                 height: 100,
                 child: CircularProgressIndicator(
-                  value: course.percentComplete,
+                  value: score / 100,
                   strokeWidth: 10,
                   backgroundColor: colorScheme.outlineVariant.withValues(alpha: 0.2),
-                  valueColor: const AlwaysStoppedAnimation<Color>(AppDesignSystem.primaryColor),
+                  valueColor: AlwaysStoppedAnimation<Color>(scoreColor),
                 ),
               ),
-              Text(
-                '${(course.percentComplete * 100).round()}%',
-                style: AppDesignSystem.valueText(textTheme),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '$score%',
+                    style: AppDesignSystem.valueText(textTheme).copyWith(
+                      fontSize: 24,
+                      color: scoreColor,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Icon(
+                    score >= 90 
+                      ? Icons.star 
+                      : score >= 75 
+                        ? Icons.thumb_up 
+                        : Icons.trending_up,
+                    size: 16,
+                    color: scoreColor.withValues(alpha: 0.7),
+                  ),
+                ],
               ),
             ],
           ),
         ),
         const SizedBox(height: AppDesignSystem.spacing12),
         Text(
-          course.title.split('-').first.trim(),
-          style: AppDesignSystem.bodyBold(textTheme),
+          'Chapter $chapterNumber',
+          style: AppDesignSystem.bodyBold(textTheme).copyWith(fontSize: 13),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: AppDesignSystem.spacing4),
-        Text(
-          course.title.split('-').last.trim(),
-          style: AppDesignSystem.caption(textTheme, colorScheme.onSurfaceVariant),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          decoration: BoxDecoration(
+            color: scoreColor.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Text(
+            score >= 90 ? 'Excellent' : score >= 75 ? 'Good' : score >= 60 ? 'Fair' : 'Practice',
+            style: TextStyle(
+              fontSize: 10,
+              color: scoreColor,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ),
       ],
     );

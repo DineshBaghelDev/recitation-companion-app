@@ -4,11 +4,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/design_system.dart';
 import '../providers/user_providers.dart';
 
-class CommunityScreen extends ConsumerWidget {
+class CommunityScreen extends ConsumerStatefulWidget {
   const CommunityScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CommunityScreen> createState() => _CommunityScreenState();
+}
+
+class _CommunityScreenState extends ConsumerState<CommunityScreen> {
+  bool _hideMyRank = false;
+
+  @override
+  Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
     final userData = ref.watch(userDataProvider);
@@ -114,13 +121,21 @@ class CommunityScreen extends ConsumerWidget {
                   ),
                   const SizedBox(width: AppDesignSystem.spacing16),
                   Expanded(
-                    child: _StatCard(
-                      icon: Icons.emoji_events_outlined,
-                      value: '#4',
-                      label: 'Your\nRank',
-                      colorScheme: colorScheme,
-                      isHighlight: true,
-                    ),
+                    child: _hideMyRank 
+                      ? _StatCard(
+                          icon: Icons.self_improvement,
+                          value: 'Hidden',
+                          label: 'Your\nRank',
+                          colorScheme: colorScheme,
+                          isHighlight: false,
+                        )
+                      : _StatCard(
+                          icon: Icons.emoji_events_outlined,
+                          value: '#4',
+                          label: 'Your\nRank',
+                          colorScheme: colorScheme,
+                          isHighlight: true,
+                        ),
                   ),
                 ],
               ),
@@ -135,32 +150,96 @@ class CommunityScreen extends ConsumerWidget {
                     'Top Learners',
                     style: AppDesignSystem.subheading(textTheme),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppDesignSystem.spacing12,
-                      vertical: AppDesignSystem.spacing8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFF6B35).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(AppDesignSystem.radiusSmall),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.refresh,
-                          size: 16,
-                          color: Color(0xFFFF6B35),
-                        ),
-                        const SizedBox(width: AppDesignSystem.spacing4),
-                        Text(
-                          'Live',
-                          style: AppDesignSystem.bodyBold(textTheme).copyWith(
-                            color: const Color(0xFFFF6B35),
-                            fontSize: 12,
+                  Row(
+                    children: [
+                      // Hide Rank Toggle
+                      InkWell(
+                        onTap: () {
+                          setState(() {
+                            _hideMyRank = !_hideMyRank;
+                          });
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                _hideMyRank 
+                                  ? 'Your rank is now hidden. Focus on your spiritual journey!' 
+                                  : 'Your rank is now visible.',
+                              ),
+                              duration: const Duration(seconds: 2),
+                              behavior: SnackBarBehavior.floating,
+                              backgroundColor: _hideMyRank 
+                                ? Colors.purple.shade600 
+                                : AppDesignSystem.primaryColor,
+                            ),
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(AppDesignSystem.radiusSmall),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppDesignSystem.spacing12,
+                            vertical: AppDesignSystem.spacing8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _hideMyRank 
+                              ? Colors.purple.shade50 
+                              : const Color(0xFFFF6B35).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(AppDesignSystem.radiusSmall),
+                            border: Border.all(
+                              color: _hideMyRank 
+                                ? Colors.purple.shade200 
+                                : const Color(0xFFFF6B35).withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                _hideMyRank ? Icons.visibility_off : Icons.visibility,
+                                size: 16,
+                                color: _hideMyRank ? Colors.purple.shade700 : const Color(0xFFFF6B35),
+                              ),
+                              const SizedBox(width: AppDesignSystem.spacing4),
+                              Text(
+                                _hideMyRank ? 'Show Rank' : 'Hide Rank',
+                                style: AppDesignSystem.bodyBold(textTheme).copyWith(
+                                  color: _hideMyRank ? Colors.purple.shade700 : const Color(0xFFFF6B35),
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Live indicator
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppDesignSystem.spacing12,
+                          vertical: AppDesignSystem.spacing8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFF6B35).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(AppDesignSystem.radiusSmall),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.refresh,
+                              size: 16,
+                              color: Color(0xFFFF6B35),
+                            ),
+                            const SizedBox(width: AppDesignSystem.spacing4),
+                            Text(
+                              'Live',
+                              style: AppDesignSystem.bodyBold(textTheme).copyWith(
+                                color: const Color(0xFFFF6B35),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -185,10 +264,16 @@ class CommunityScreen extends ConsumerWidget {
                     ),
                     
                     // Rest of the leaderboard
-                    ...leaderboardData.skip(3).map((entry) => _LeaderboardItem(
-                          entry: entry,
-                          showMedal: false,
-                        )),
+                    ...leaderboardData.skip(3).map((entry) {
+                      // Hide current user's entry if toggle is enabled
+                      if (entry.isCurrentUser && _hideMyRank) {
+                        return const SizedBox.shrink();
+                      }
+                      return _LeaderboardItem(
+                        entry: entry,
+                        showMedal: false,
+                      );
+                    }),
                   ],
                 ),
               ),

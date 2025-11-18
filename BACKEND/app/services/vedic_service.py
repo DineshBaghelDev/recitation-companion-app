@@ -14,6 +14,22 @@ class VedicScripturesService:
         self.base_url = settings.vedic_api_base_url
         self.timeout = 30.0
     
+    def _clean_slok_text(self, slok: str) -> str:
+        """
+        Clean the slok text by removing the ||chapter-verse|| pattern at the end.
+        
+        Args:
+            slok: The raw slok text with verse reference
+            
+        Returns:
+            Cleaned slok text without the verse reference pattern
+        """
+        import re
+        # Remove the ||chapter-verse|| pattern (e.g., ||१-१||, ||२-५||, etc.)
+        # This pattern appears at the end of verses
+        cleaned = re.sub(r'\s*\|\|[०-९\d]+-[०-९\d]+\|\|\s*$', '', slok)
+        return cleaned.strip()
+    
     async def _fetch_json(self, endpoint: str) -> Any:
         """Fetch JSON data from the API."""
         # Ensure endpoint ends with trailing slash (required by GitHub Pages)
@@ -71,10 +87,13 @@ class VedicScripturesService:
         hindi_translation = self._extract_translation(data, "rams", "ht")
         english_translation = self._extract_translation(data, "gambir", "et")
         
+        # Clean the slok text to remove ||chapter-verse|| pattern
+        slok_text = self._clean_slok_text(data.get("slok", ""))
+        
         return {
             "chapter": chapter,
             "verse": verse,
-            "slok": data.get("slok", ""),
+            "slok": slok_text,
             "transliteration": data.get("transliteration", ""),
             "hindi_translation": hindi_translation,
             "english_translation": english_translation
@@ -193,11 +212,10 @@ class VedicScripturesService:
         
         # Use current date as seed for deterministic selection
         today = datetime.now()
-        day_of_year = today.timetuple().tm_yday  # 1-365/366
         
-        # Total verses in Bhagavad Gita: 700
-        # We'll cycle through all chapters proportionally
-        # Simple algorithm: use day_of_year modulo total verses
+        # Create a unique number for each day using year, month, and day
+        # This ensures different verses for different days across years
+        day_seed = today.year * 10000 + today.month * 100 + today.day
         
         # Chapter verse counts (Bhagavad Gita)
         chapter_verses = {
@@ -207,7 +225,9 @@ class VedicScripturesService:
         }
         
         total_verses = sum(chapter_verses.values())  # 700
-        verse_index = day_of_year % total_verses
+        
+        # Use the day_seed to generate a verse index
+        verse_index = day_seed % total_verses
         
         # Find which chapter and verse this index corresponds to
         cumulative = 0

@@ -11,7 +11,11 @@ import '../providers/user_providers.dart';
 import 'course_progress_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({super.key, this.onMenuPressed, this.onNavigate, this.onProfilePressed});
+  
+  final VoidCallback? onMenuPressed;
+  final ValueChanged<int>? onNavigate;
+  final VoidCallback? onProfilePressed;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -35,6 +39,8 @@ class HomeScreen extends ConsumerWidget {
                   stats: stats,
                   featuredCourse: featuredCourse,
                   userName: userData.name,
+                  onMenuPressed: onMenuPressed,
+                  onProfilePressed: onProfilePressed,
                 ).animate().fadeIn(duration: 450.ms, curve: Curves.easeOutQuad),
                 Padding(
                   padding: AppDesignSystem.screenPadding,
@@ -48,78 +54,8 @@ class HomeScreen extends ConsumerWidget {
                           stats: stats,
                         ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.08),
                       const SizedBox(height: AppDesignSystem.spacing28),
-                      Text(
-                        'Quick Access',
-                        style: AppDesignSystem.subheading(textTheme),
-                      ),
-                      const SizedBox(height: AppDesignSystem.spacing16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _HomeAction(
-                              icon: Icons.menu_book_rounded,
-                              label: 'My Library',
-                              onTap: () {
-                                // Navigate to Learn tab (index 1 in bottom navigation)
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: const Text('Switch to Learn tab to browse your library'),
-                                    backgroundColor: AppDesignSystem.primaryColor,
-                                    duration: const Duration(seconds: 2),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _HomeAction(
-                              icon: Icons.favorite_border,
-                              label: 'Favourites',
-                              onTap: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: const Text('Favourites feature coming soon!'),
-                                    backgroundColor: AppDesignSystem.primaryColor,
-                                    duration: const Duration(seconds: 2),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _HomeAction(
-                              icon: Icons.report_problem_outlined,
-                              label: 'Problematic verses',
-                              onTap: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: const Text('Track your challenging verses - coming soon!'),
-                                    backgroundColor: AppDesignSystem.primaryColor,
-                                    duration: const Duration(seconds: 2),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _HomeAction(
-                              icon: Icons.auto_awesome,
-                              label: 'AI Guru',
-                              onTap: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: const Text('AI pronunciation coach - in development'),
-                                    backgroundColor: AppDesignSystem.primaryColor,
-                                    duration: const Duration(seconds: 2),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
+                      _QuickAccessSection(
+                        onNavigate: onNavigate,
                       ).animate().fadeIn(duration: 550.ms).slideY(begin: 0.05),
                       const SizedBox(height: AppDesignSystem.spacing28),
                       // Verse of the Day Card - Fetched from API
@@ -143,17 +79,44 @@ class HomeScreen extends ConsumerWidget {
                             ),
                           ),
                         ),
-                        error: (err, stack) => const _VerseOfTheDayCard(
-                          verse: Verse(
-                            chapter: 2,
-                            verse: 47,
-                            slok: 'कर्मण्येवाधिकारस्ते मा फलेषु कदाचन।\nमा कर्मफलहेतुर्भूर्मा ते सङ्गोऽस्त्वकर्मणि।।',
-                            transliteration: 'karmaṇyevādhikāraste mā phaleṣu kadācana\nmā karmaphalaheturbhūrmā te saṅgo\'stvakarmaṇi',
-                            hindiTranslation: 'तुम्हारा कर्म करने में ही अधिकार है, फल में कभी नहीं।',
-                            englishTranslation: 'You have a right to perform your prescribed duties, but you are not entitled to the fruits of your actions.',
-                            mastery: 0.95,
-                          ),
-                        ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.08),
+                        error: (err, stack) {
+                          // Show fallback verse with error indicator
+                          return Column(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.orange.shade100,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.warning_amber, color: Colors.orange, size: 16),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        'Unable to load today\'s verse. Showing fallback.',
+                                        style: TextStyle(color: Colors.orange.shade900, fontSize: 12),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              const _VerseOfTheDayCard(
+                                verse: Verse(
+                                  chapter: 2,
+                                  verse: 47,
+                                  slok: 'कर्मण्येवाधिकारस्ते मा फलेषु कदाचन।\nमा कर्मफलहेतुर्भूर्मा ते सङ्गोऽस्त्वकर्मणि।।',
+                                  transliteration: 'karmaṇyevādhikāraste mā phaleṣu kadācana\nmā karmaphalaheturbhūrmā te saṅgo\'stvakarmaṇi',
+                                  hindiTranslation: 'तुम्हारा कर्म करने में ही अधिकार है, फल में कभी नहीं।',
+                                  englishTranslation: 'You have a right to perform your prescribed duties, but you are not entitled to the fruits of your actions.',
+                                  mastery: 0.95,
+                                ),
+                              ),
+                            ],
+                          ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.08);
+                        },
                       ),
                       const SizedBox(height: AppDesignSystem.spacing28),
                       Text(
@@ -361,20 +324,24 @@ class _HeroSection extends StatelessWidget {
     required this.stats,
     this.featuredCourse,
     this.userName,
+    this.onMenuPressed,
+    this.onProfilePressed,
   });
 
   final ProgressStats stats;
   final Course? featuredCourse;
   final String? userName;
+  final VoidCallback? onMenuPressed;
+  final VoidCallback? onProfilePressed;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 260,
+      height: 300,
       child: Container(
         decoration: const BoxDecoration(
           image: DecorationImage(
-            image: AssetImage('assets/images/hero.png'),
+            image: AssetImage('assets/images/hero6.png'),
             fit: BoxFit.cover,
           ),
         ),
@@ -406,11 +373,11 @@ class _HeroSection extends StatelessWidget {
                       IconButton(
                         icon: const Icon(Icons.menu_rounded),
                         color: Colors.black,
-                        onPressed: () {
+                        onPressed: onMenuPressed ?? () {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: const Text('Menu feature coming soon!'),
-                              backgroundColor: AppDesignSystem.primaryColor,
+                              content: const Text('Menu feature not available'),
+                              backgroundColor: Colors.red,
                               duration: const Duration(seconds: 2),
                             ),
                           );
@@ -445,8 +412,14 @@ class _HeroSection extends StatelessWidget {
                       IconButton(
                         icon: const Icon(Icons.account_circle_outlined),
                         color: Colors.black,
-                        onPressed: () {
-                          Navigator.of(context).pushNamed('/profile');
+                        onPressed: onProfilePressed ?? () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Profile feature not available'),
+                              backgroundColor: Colors.red,
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
                         },
                       ),
                     ],
@@ -461,6 +434,60 @@ class _HeroSection extends StatelessWidget {
   }
 }
 
+class _QuickAccessSection extends StatelessWidget {
+  const _QuickAccessSection({this.onNavigate});
+  
+  final ValueChanged<int>? onNavigate;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Quick Access',
+          style: AppDesignSystem.subheading(textTheme),
+        ),
+        const SizedBox(height: AppDesignSystem.spacing16),
+        Row(
+          children: [
+            Expanded(
+              child: _HomeAction(
+                icon: Icons.favorite_border,
+                label: 'Favourites',
+                onTap: () {
+                  Navigator.pushNamed(context, '/favorites');
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _HomeAction(
+                icon: Icons.report_problem_outlined,
+                label: 'Problematic verses',
+                onTap: () {
+                  Navigator.pushNamed(context, '/problematic-verses');
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _HomeAction(
+                icon: Icons.auto_awesome,
+                label: 'AI Guru',
+                onTap: () {
+                  Navigator.pushNamed(context, '/ai-guru');
+                },
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
 
 
 class _HomeAction extends StatelessWidget {

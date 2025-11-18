@@ -17,6 +17,9 @@ dependencies:
   percent_indicator: ^4.2.3
   flutter_animate: ^4.2.0
   http: ^1.1.0
+  record: ^5.1.2
+  permission_handler: ^11.3.1
+  path_provider: ^2.1.4
 
 dev_dependencies:
   flutter_test:
@@ -27,4 +30,10 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/hero.png
+    - assets/images/hero3.png
+    - assets/images/hero4.png
+    - assets/images/hero5.png
+    - assets/images/hero6.png
     - assets/images/mascot.png
+    - assets/images/favicon.png
+    - assets/images/mascot2.png

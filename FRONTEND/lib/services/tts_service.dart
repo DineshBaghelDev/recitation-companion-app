@@ -22,6 +22,9 @@ class TtsService {
   final AudioPlayer _player = AudioPlayer();
   bool _isPlaying = false;
   bool _isLoading = false;
+  
+  // Cache for audio bytes to avoid regenerating for the same text
+  final Map<String, Uint8List> _audioCache = {};
 
   /// Get current playing status
   bool get isPlaying => _isPlaying;
@@ -48,20 +51,35 @@ class TtsService {
     try {
       _isLoading = true;
 
-      // Build the API URL
-      final uri = Uri.parse(
-        "${ApiConfig.baseUrl}/api/v1/tts/generate?text=${Uri.encodeComponent(text)}&temperature=$temperature&top_p=$topP",
-      );
+      // Create cache key
+      final cacheKey = '$text-$temperature-$topP';
+      
+      Uint8List audioBytes;
+      
+      // Check if we have cached audio for this text
+      if (_audioCache.containsKey(cacheKey)) {
+        // Use cached audio
+        audioBytes = _audioCache[cacheKey]!;
+        _isLoading = false;
+      } else {
+        // Generate new audio from backend
+        final uri = Uri.parse(
+          "${ApiConfig.baseUrl}/api/v1/tts/generate?text=${Uri.encodeComponent(text)}&temperature=$temperature&top_p=$topP",
+        );
 
-      // Fetch audio from backend
-      final response = await http.get(uri);
+        // Fetch audio from backend
+        final response = await http.get(uri);
 
-      if (response.statusCode != 200) {
-        throw Exception('TTS generation failed: ${response.body}');
+        if (response.statusCode != 200) {
+          throw Exception('TTS generation failed: ${response.body}');
+        }
+
+        // Get audio bytes and cache them
+        audioBytes = response.bodyBytes;
+        _audioCache[cacheKey] = audioBytes;
+        
+        _isLoading = false;
       }
-
-      // Get audio bytes
-      final audioBytes = response.bodyBytes;
 
       // Set up audio source
       await _player.setAudioSource(
@@ -143,9 +161,18 @@ class TtsService {
     await _player.setSpeed(speed.clamp(0.5, 2.0));
   }
 
+  /// Clear the audio cache
+  void clearCache() {
+    _audioCache.clear();
+  }
+  
+  /// Get cache size (number of cached audio items)
+  int get cacheSize => _audioCache.length;
+
   /// Dispose resources
   void dispose() {
     _player.dispose();
+    _audioCache.clear();
   }
 
   /// Generate TTS audio bytes without playing (for caching)
