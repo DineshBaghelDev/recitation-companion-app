@@ -1,42 +1,114 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-ENV/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
+# Python# Python# Python
 
-# Environment
-.env
-.venv
+__pycache__/
+
+*.py[cod]__pycache__/__pycache__/
+
+*$py.class
+
+*.so*.py[cod]*.py[cod]
+
+.Python
+
+*$py.class*$py.class
+
+# Environment Variables
+
+.env*.so*.so
+
+.env.local
+
+.Python.Python
 
 # IDE
-.vscode/
+
+.vscode/env/
+
 .idea/
-*.swp
+
+*.swp# Virtual Environmentvenv/
+
 *.swo
-*~
+
+venv/ENV/
 
 # Testing
-.pytest_cache/
+
+.pytest_cache/venv312/build/
+
 .coverage
+
+htmlcov/ENV/develop-eggs/
+
+
+
+# Logsenv/dist/
+
+*.log
+
+downloads/
+
+# Audio test files
+
+*.mp3# Environment Variableseggs/
+
+*.wav
+
+.env.eggs/
+
+# Build artifacts
+
+build/.env.locallib/
+
+dist/
+
+*.egg-info/lib64/
+
+
+# IDEparts/
+
+.vscode/sdist/
+
+.idea/var/
+
+*.swpwheels/
+
+*.swo*.egg-info/
+
+.installed.cfg
+
+# Testing*.egg
+
+.pytest_cache/
+
+.coverage# Environment
+
+htmlcov/.env
+
+.venv
+
+# Logs
+
+*.log# IDE
+
+.vscode/
+
+# Audio test files.idea/
+
+*.mp3*.swp
+
+*.wav*.swo
+
+*~
+
+# Build artifacts
+
+build/# Testing
+
+dist/.pytest_cache/
+
+*.egg-info/.coverage
+
 htmlcov/
 
 # Logs
